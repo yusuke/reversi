@@ -24,7 +24,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-package jp.samuraism;
+package jp.samuraism.reversi;
 
 import java.applet.Applet;
 import java.awt.*;
@@ -34,7 +34,7 @@ import java.awt.event.MouseEvent;
 /**
  * @author Yusuke Yamamoto - yusuke at mac.com
  */
-public class Reversi extends Applet {
+public class ReversiApplet extends Applet {
     private final static boolean DEBUG = true;
     private Image board[][] = new Image[8][8];
     private Image white, black, blank;
