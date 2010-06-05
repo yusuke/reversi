@@ -30,18 +30,23 @@ import java.applet.Applet;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import static jp.samuraism.reversi.Board.State.*;
+
 
 /**
  * @author Yusuke Yamamoto - yusuke at mac.com
  */
 public class ReversiApplet extends Applet {
     private final static boolean DEBUG = true;
-    private Image board[][] = new Image[8][8];
     private Image white, black, blank;
     private int cellWidth, cellHeight, width, height;
     private Image turn;
 
+    private Board board;
+
     public void init() {
+        board = new Board(8, 8);
+
         white = getImage(getDocumentBase(), getParameter("white"));
         black = getImage(getDocumentBase(), getParameter("black"));
         blank = getImage(getDocumentBase(), getParameter("blank"));
@@ -53,18 +58,6 @@ public class ReversiApplet extends Applet {
         width = d.width;
         height = d.height;
         addMouseListener(ma);
-        log("initializing the board");
-        for (int i = 0; i < 8; i++) {
-            for (int j = 0; j < 8; j++) {
-                if ((i == 3 && j == 3) || (i == 4 && j == 4)) {
-                    board[i][j] = black;
-                } else if ((i == 3 && j == 4) || (i == 4 && j == 3)) {
-                    board[i][j] = white;
-                } else {
-                    board[i][j] = blank;
-                }
-            }
-        }
     }
 
     MouseAdapter ma = new MouseAdapter() {
@@ -87,10 +80,34 @@ public class ReversiApplet extends Applet {
         }
     };
 
+    private Image getImage(int x, int y){
+        Board.State state = board.getGrid()[x][y];
+        switch(state){
+            case WHITE:
+                return white;
+            case BLACK:
+                return black;
+            case BLANK:
+                return blank;
+        }
+        throw new AssertionError();
+    }
+    private Board.State toState(Image stateImage){
+        if(stateImage == white){
+            return WHITE;
+        }else if(stateImage == black){
+            return BLACK;
+        }else if(stateImage == blank){
+            return BLANK;
+        }
+        throw new AssertionError();
+    }
+
+
     public void paint(Graphics g) {
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
-                g.drawImage(board[i][j], 1 + (cellWidth + 1) * i + i,
+                g.drawImage(getImage(i, j), 1 + (cellWidth + 1) * i + i,
                         1 + (cellHeight + 1) * j + j, cellWidth, cellHeight, this);
             }
         }
@@ -114,7 +131,7 @@ public class ReversiApplet extends Applet {
     public boolean isPlaceable(Image state) {
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
-                if (searchPlaceableDirection(i, j, state) != 0) {
+                if (board.searchPlaceableDirection(i, j, toState(state)) != 0) {
                     return true;
                 }
             }
@@ -126,9 +143,9 @@ public class ReversiApplet extends Applet {
         int whiteCount = 0, blackCount = 0;
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
-                if (board[i][j] == white) {
+                if (board.getGrid()[i][j] == WHITE) {
                     whiteCount++;
-                } else if (board[i][j] == black) {
+                } else if (board.getGrid()[i][j] == BLACK) {
                     blackCount++;
                 }
             }
@@ -164,20 +181,20 @@ public class ReversiApplet extends Applet {
         byte search = 1;
         byte direction;
         //駒を置けるかどうかの判定
-        if ((direction = searchPlaceableDirection(x, y, state)) != 0) {
+        if ((direction = board.searchPlaceableDirection(x, y, toState(state))) != 0) {
             //i,j = 探索するベクトル
             for (int i = -1; i <= 1; i++) {
                 for (int j = -1; j <= 1; j++) {
                     if (((i == 0) && (j == 0))) continue;
                     if ((direction & search) == search) {
-                        for (int k = 1; board[x + i * k][y + j * k] != state; k++) {
-                            board[x + i * k][y + j * k] = state;
+                        for (int k = 1; getImage(x + i * k, y + j * k) != state; k++) {
+                            board.getGrid()[x + i * k][y + j * k] = toState(state);
                         }
                     }
                     search <<= 1;
                 }
             }
-            board[x][y] = state;
+            board.getGrid()[x][y] = toState(state);
             return true;
         } else {
             //置けない!
@@ -185,57 +202,7 @@ public class ReversiApplet extends Applet {
         }
     }
 
-    /**
-     * 駒を置けるかどうかの判定
-     *
-     * @param x x座標
-     * @param y y座標
-     * @param state 置く色
-     * @return byteで駒を置けるかどうか ビット毎に置ける方向を示す 0:左上 1:左  2:左下  3:上  4:下  5:右上  6:右  7:右下
-     */
-    public byte searchPlaceableDirection(int x, int y, Image state) {
-        byte direction = 0;
-        byte search = 1;
-        if (board[x][y] == blank) {
-            for (int xx = -1; xx <= 1; xx++) {
-                for (int yy = -1; yy <= 1; yy++) {
-                    // xx, yy :探索するベクトル
-                    if (isInsideBoard(x + xx, y + yy)) {
-                        ///一つとなりに置く駒と違う色があるか
-                        if ((board[x + xx][y + yy] != blank) && (board[x + xx][y + yy] != state)) {
-                            //さらにその先に置く駒の色があるか盤面上を探索
-                            for (int k = 2; isInsideBoard(x + xx * k, y + yy * k); k++) {
-                                if (board[x + xx * k][y + yy * k] == state) {
-                                    //自分の色があった、石を置ける！
-                                    direction |= search;
-                                } else if (board[x + xx * k][y + yy * k] == blank) {
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    if (!((xx == 0) && (yy == 0))) {
-                        search <<= 1;
-                    }
-                }
-            }
-            //どの方向にも置けない
-            return direction;
-        } else {
-            //既に駒があって置けない！
-            return 0;
-        }
-    }
 
-    /**
-     * 座標が盤の中に収まっているかどうか
-     * @param x x座標
-     * @param y y座標
-     * @return 収まっているかどうか
-     */
-    private boolean isInsideBoard(int x, int y) {
-        return (x >= 0) && (x < board.length) & (y >= 0) && (y < board[0].length);
-    }
 
     private static void log(String message) {
         if (DEBUG) {
