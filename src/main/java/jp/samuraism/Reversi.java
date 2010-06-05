@@ -26,118 +26,100 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 package jp.samuraism;
 
-import java.awt.event.*;
-import java.applet.*;
+import java.applet.Applet;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 /**
  * @author Yusuke Yamamoto - yusuke at mac.com
  */
-public class Reversi extends Applet implements MouseListener {
-    Koma ishi[][] = new Koma[8][8];
-    Image white, black, blank;
-    int cellWidth, cellHeight, width, height;
-    Image turn;
-    Image buffer;
-    Graphics bufferg;
+public class Reversi extends Applet {
+    private final static boolean DEBUG = true;
+    private Image board[][] = new Image[8][8];
+    private Image white, black, blank;
+    private int cellWidth, cellHeight, width, height;
+    private Image turn;
+    private Image buffer;
 
     public void init() {
         white = getImage(getDocumentBase(), getParameter("white"));
         black = getImage(getDocumentBase(), getParameter("black"));
         blank = getImage(getDocumentBase(), getParameter("blank"));
-        turn = black;//最初は黒から
+        // always starts with black's turn
+        turn = black;
         Dimension d = getSize();
-        cellWidth = (d.width-9)/8;
-        cellHeight = (d.height-9)/8;
+        cellWidth = (d.width - 9) / 8;
+        cellHeight = (d.height - 9) / 8;
         width = d.width;
         height = d.height;
         buffer = createImage(width, height);
-        addMouseListener(this);
-        // 盤面の初期化
-        System.out.println("initializing ban");
+        addMouseListener(ma);
+        log("initializing the board");
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
-                if ((i == 3 & j == 3) || (i == 4 & j == 4)) {
-                    ishi[i][j] = new Koma(i, j, black);
-                } else if ((i == 3 & j == 4) || (i == 4 & j == 3)) {
-                    ishi[i][j] = new Koma(i, j, white);
+                if ((i == 3 && j == 3) || (i == 4 && j == 4)) {
+                    board[i][j] = black;
+                } else if ((i == 3 && j == 4) || (i == 4 && j == 3)) {
+                    board[i][j] = white;
                 } else {
-                    ishi[i][j] = new Koma(i, j, blank);
+                    board[i][j] = blank;
                 }
             }
         }
     }
 
-    public void mouseClicked(MouseEvent me) {
-    }
-
-    public void mouseReleased(MouseEvent me) {
-    }
-
-    public void mouseEntered(MouseEvent me) {
-    }
-
-    public void mouseExited(MouseEvent me) {
-    }
-
-    public void mousePressed(MouseEvent me) {
-        Point p = me.getPoint();
-        if(PutKoma(p.x/(cellWidth+1),p.y/(cellHeight+1),turn)){
-            System.out.println("ok");
-            repaint();
-            turn = ReverseColor(turn);
-            if(!CanPut(turn)){
-                System.out.println("1");
-                //2人とも置ける駒がないか？
-                if(!CanPut(ReverseColor(turn))){
-                    System.out.println("2");
-                    Finish();//終了
-                    System.exit(0);
-                }else{
-                    System.out.println("3");
-                    //パス
-                    turn=ReverseColor(turn);
+    MouseAdapter ma = new MouseAdapter() {
+        public void mousePressed(MouseEvent me) {
+            Point p = me.getPoint();
+            if (place(p.x / (cellWidth + 1), p.y / (cellHeight + 1), turn)) {
+                log("ok");
+                repaint();
+                turn = getReversedColor(turn);
+                if (!isPlacable(turn)) {
+                    log("1");
+                    if (!isPlacable(getReversedColor(turn))) {
+                        // both players are not placable
+                        log("2");
+                        judge();
+                    } else {
+                        // pass
+                        log("3");
+                        turn = getReversedColor(turn);
+                    }
                 }
+            } else {
+                log("invalid axis");
             }
-            if(turn == black){
-                System.out.println("black");
-            }else if(turn == white){
-                System.out.println("white");
-            }else if(turn == blank){
-                System.out.println("blank");
-            }
-        }else{
-            System.out.println("no");
         }
-    }
+    };
 
     public void paint(Graphics g) {
-        if(bufferg == null){
-            bufferg = buffer.getGraphics();
-        }
         for (int i = 0; i < 8; i++) {
-            for(int j=0;j<8;j++){
-                bufferg.drawImage(ishi[i][j].State(), 1 + (cellWidth + 1) * i,
+            for (int j = 0; j < 8; j++) {
+                buffer.getGraphics().drawImage(board[i][j], 1 + (cellWidth + 1) * i,
                         1 + (cellHeight + 1) * j, cellWidth, cellHeight, this);
             }
         }
 
-        bufferg.setColor(Color.black);
+        buffer.getGraphics().setColor(Color.black);
         for (int i = 0; i <= 8; i++) {
-            bufferg.drawLine(0, i * (cellHeight + 1), width - 1, i * (cellHeight + 1));
-            bufferg.drawLine(i * (cellWidth + 1), 0, i * (cellWidth + 1), height - 1);
+            buffer.getGraphics().drawLine(0, i * (cellHeight + 1), width - 1, i * (cellHeight + 1));
+            buffer.getGraphics().drawLine(i * (cellWidth + 1), 0, i * (cellWidth + 1), height - 1);
         }
 
         g.drawImage(buffer, 0, 0, this);
     }
-    public void update(Graphics g){
+
+    public void update(Graphics g) {
         paint(g);
     }
     //置ける場所が一カ所でもあるか判定するメソッド
-    public boolean CanPut(Image iro){
-        for(int i=0;i<8;i++){
-            for(int j=0;j<8;j++){
-                if(CanPutKoma(i,j,iro)!=0){
+
+    public boolean isPlacable(Image state) {
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                if (canPutKoma(i, j, state) != 0) {
                     return true;
                 }
             }
@@ -145,130 +127,121 @@ public class Reversi extends Applet implements MouseListener {
         return false;
     }
 
-    public void Finish(){
-        int whiteCount = 0, blackCount=0;
-        for(int  i=0;i<8;i++){
-            for(int j=0;j<8;j++){
-                if(ishi[i][j].State()==white){
+    public void judge() {
+        int whiteCount = 0, blackCount = 0;
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                if (board[i][j] == white) {
                     whiteCount++;
-                }else if(ishi[i][j].State() == black){
+                } else if (board[i][j] == black) {
                     blackCount++;
                 }
             }
         }
-        System.out.println("Black:"+blackCount+" "+"White:"+whiteCount);
+        log("Black:" + blackCount + " " + "White:" + whiteCount);
     }
-    //反対の色を返す
-    Image ReverseColor(Image iro){
-        if(iro == white){
+
+    /**
+     * 反対の色を返す
+     *
+     * @param state
+     * @return
+     */
+    Image getReversedColor(Image state) {
+        if (state == white) {
             return black;
-        }else if(iro == black){
+        } else if (state == black) {
             return white;
-        }else{
+        } else {
             return blank;
         }
     }
-    //駒を置く
-    //戻り値:boolean 駒を置けたかどうか
-    boolean PutKoma(int x, int y, Image iro){
+
+    /**
+     * 駒を置く
+     *
+     * @param x     x-axis
+     * @param y     y-axis
+     * @param state state
+     * @return if the placement succeeded
+     */
+
+    boolean place(int x, int y, Image state) {
         byte search = 1;
         byte direction;
         //駒を置けるかどうかの判定
-        if((direction=CanPutKoma(x,y,iro))!=0){
+        if ((direction = canPutKoma(x, y, state)) != 0) {
             //i,j = 探索するベクトル
-            for(int i=-1;i<=1;i++){
-                for(int j=-1;j<=1;j++){
-                    if(((i==0)&(j==0))) continue;
-                    if((direction & search) == search){
-                        for(int k=1;ishi[x+i*k][y+j*k].State()!=iro;k++){
-                            ishi[x+i*k][y+j*k].Turn(iro);
+            for (int i = -1; i <= 1; i++) {
+                for (int j = -1; j <= 1; j++) {
+                    if (((i == 0) && (j == 0))) continue;
+                    if ((direction & search) == search) {
+                        for (int k = 1; board[x + i * k][y + j * k] != state; k++) {
+                            board[x + i * k][y + j * k] = state;
                         }
                     }
                     search <<= 1;
                 }
             }
-            if(direction != 0){
-                ishi[x][y].Put(iro);
-                return true;
-            }
-            return false;
-        }else{
+            board[x][y] = state;
+            return true;
+        } else {
             //置けない!
             return false;
         }
     }
-    //CanPutKoma : 駒を置く
-    //戻り値 : byte 駒を置けるかどうか ビット毎に置ける方向を示す
-    //0:左上 1:左  2:左下  3:上  4:下  5:右上  6:右  7:右下
-    public byte CanPutKoma(int x, int y, Image iro){
+
+    /**
+     * 駒を置けるかどうかの判定
+     *
+     * @param x
+     * @param y
+     * @param state 置く色
+     * @return byteで駒を置けるかどうか ビット毎に置ける方向を示す 0:左上 1:左  2:左下  3:上  4:下  5:右上  6:右  7:右下
+     */
+    public byte canPutKoma(int x, int y, Image state) {
         byte direction = 0;
         byte search = 1;
-        //駒を置けるかどうかの判定
-        if(ishi[x][y].State() == blank){
+        if (board[x][y] == blank) {
             //i,j:探索するベクトル
-            for(int i=-1;i<=1;i++){
+            for (int i = -1; i <= 1; i++) {
                 for (int j = -1; j <= 1; j++) {
-                    if (IsIn(x + i, y + j)) {
+                    if (isInGrid(x + i, y + j)) {
                         ///一つとなりに置く駒と違う色があるか
-                        if ((ishi[x + i][y + j].State() != blank) & (ishi[x + i][y + j].State() != iro)) {
+                        if ((board[x + i][y + j] != blank) && (board[x + i][y + j] != state)) {
                             //さらにその先に置く駒の色があるか
-                            for (int k = 2; IsIn(x + i * k, y + j * k); k++) {
-                                if (ishi[x + i * k][y + j * k].State() == iro) {
+                            for (int k = 2; isInGrid(x + i * k, y + j * k); k++) {
+                                if (board[x + i * k][y + j * k] == state) {
                                     //石を置ける！
                                     direction |= search;
-                                } else if (ishi[x + i * k][y + j * k].State() == blank) {
+                                } else if (board[x + i * k][y + j * k] == blank) {
                                     break;
                                 }
                             }
                         }
                     }
-                    if (!((i == 0) & (j == 0))) {
+                    if (!((i == 0) && (j == 0))) {
                         search <<= 1;
                     }
                 }
             }
             //どの方向にも置けない
             return direction;
-        }else{
+        } else {
             //既に駒があって置けない！
             return 0;
         }
     }
+
     //座標が盤の中に収まっているかどうか
-    boolean IsIn(int x, int y){
-        return (x>=0)&(x<ishi.length)&(y>=0)&(y<ishi[0].length);
-    }
-    //State:駒の状態を返す
-    Image State(int x, int y){
-        return ishi[x][y].State();
+
+    boolean isInGrid(int x, int y) {
+        return (x >= 0) && (x < board.length) & (y >= 0) && (y < board[0].length);
     }
 
-}
-
-class Koma {
-    //インスタンス変数の宣言
-    //state 駒の状態
-    Image state;
-    int x, y;
-
-    Graphics base;
-
-    //コンストラクタ
-    Koma(int xx, int yy, Image jyotai) {
-        state = jyotai;
-        x = xx;
-        y = yy;
-    }
-
-    Image State() {
-        return state;
-    }
-
-    void Put(Image jyotai) {
-        state = jyotai;
-    }
-
-    void Turn(Image jyotai) {
-        state = jyotai;
+    private static void log(String message) {
+        if (DEBUG) {
+            System.out.println(message);
+        }
     }
 }
