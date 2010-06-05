@@ -26,14 +26,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 package jp.samuraism.reversi;
 
+
+import java.awt.*;
+
 import static jp.samuraism.reversi.Board.State.*;
 /**
  * @author Yusuke Yamamoto - yusuke at mac.com
- * @since Twitter4J 2.1.3
  */
 public class Board {
     private final static boolean DEBUG = true;
     private State[][] grid;
+    private Board.State turn;
 
     public static enum State{
         WHITE,
@@ -43,6 +46,9 @@ public class Board {
 
     public Board(int width, int height){
         log("initializing the board");
+        // always starts with black's turn
+        turn = BLACK;
+
         grid = new State[width][height];
         for (int i = 0; i < width; i++) {
             for (int j = 0; j < height; j++) {
@@ -108,6 +114,54 @@ public class Board {
             return 0;
         }
     }
+
+    public void tryPlace(int x, int y){
+        if (place(x, y)) {
+            turn = getReversedColor(turn);
+            if (!isPlaceable(turn)) {
+                if (!isPlaceable(getReversedColor(turn))) {
+                    // both players are not placeable
+                    judge();
+                } else {
+                    // pass
+                    turn = getReversedColor(turn);
+                }
+            }
+        } else {
+        }
+    }
+
+    /**
+     * 駒を置く
+     *
+     * @param x     x-axis
+     * @param y     y-axis
+     * @return if the placement succeeded
+     */
+    public boolean place(int x, int y) {
+        byte search = 1;
+        byte direction;
+        //駒を置けるかどうかの判定
+        if ((direction = searchPlaceableDirection(x, y, turn)) != 0) {
+            //i,j = 探索するベクトル
+            for (int i = -1; i <= 1; i++) {
+                for (int j = -1; j <= 1; j++) {
+                    if (((i == 0) && (j == 0))) continue;
+                    if ((direction & search) == search) {
+                        for (int k = 1; grid[x + i * k][y + j * k] != turn; k++) {
+                            grid[x + i * k][y + j * k] = turn;
+                        }
+                    }
+                    search <<= 1;
+                }
+            }
+            grid[x][y] = turn;
+            return true;
+        } else {
+            //置けない!
+            return false;
+        }
+    }
     /**
      * 座標が盤の中に収まっているかどうか
      * @param x x座標
@@ -118,4 +172,48 @@ public class Board {
         return (x >= 0) && (x < getGrid().length) & (y >= 0) && (y < getGrid()[0].length);
     }
 
+    public void judge() {
+        int whiteCount = 0, blackCount = 0;
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                if (grid[i][j] == WHITE) {
+                    whiteCount++;
+                } else if (grid[i][j] == BLACK) {
+                    blackCount++;
+                }
+            }
+        }
+        log("Black:" + blackCount + " " + "White:" + whiteCount);
+    }
+
+    /**
+     * 置ける場所が一カ所でもあるか判定する
+     * @param state 色
+     * @return 置けるかどうか
+     */
+    public boolean isPlaceable(State state) {
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                if (searchPlaceableDirection(i, j, state) != 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    /**
+     * 色を反転させる
+     *
+     * @param state 反転させる色
+     * @return 反転した色
+     */
+    private Board.State getReversedColor(Board.State state) {
+        if (state == WHITE) {
+            return BLACK;
+        } else if (state == BLACK) {
+            return WHITE;
+        } else {
+            return BLANK;
+        }
+    }
 }
